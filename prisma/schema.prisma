@@ -1,0 +1,164 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  VERIFIED_HOST
+  VERIFIED_PROVIDER
+  DOMINANT
+  SUBMISSIVE
+  CREATOR
+  MODERATOR
+  ADMIN
+}
+
+enum ServiceType {
+  INCALL
+  OUTCALL
+  VIRTUAL
+  DUNGEON_SESSION
+}
+
+enum ListingCategory {
+  INCALL
+  OUTCALL
+  DUNGEON
+  VIRTUAL
+  EVENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  displayName  String
+  role         Role     @default(USER)
+  isVerified   Boolean  @default(false)
+  avatarUrl    String?
+  bannerUrl    String?
+  bio          String?  @db.Text
+  locationName String?
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Taxonomy & Profile Details
+  kinks      KinkTag[]     @relation("UserKinks")
+  services   ServiceRate[]
+  posts      Post[]
+  vaultItems VaultContent[]
+  listings   Listing[]
+
+  // Interactions & Messages
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  likes            Like[]
+  comments         Comment[]
+}
+
+model KinkTag {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  users    User[]    @relation("UserKinks")
+  listings Listing[] @relation("ListingTags")
+}
+
+model ServiceRate {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?     @db.Text
+  ratePerHour Float
+  type        ServiceType @default(INCALL)
+  createdAt   DateTime    @default(now())
+}
+
+model Listing {
+  id          String          @id @default(cuid())
+  title       String
+  description String?         @db.Text
+  category    ListingCategory @default(INCALL)
+  status      String          @default("ACTIVE")
+  price       Float?
+  rates       String?
+  rules       String?
+  coverImage  String?
+  gallery     String[]        @default([])
+  location    String?
+  latitude    Float?
+  longitude   Float?
+  isVerified  Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  organizerId String
+  organizer   User      @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  tags        KinkTag[] @relation("ListingTags")
+}
+
+model Post {
+  id          String   @id @default(cuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content     String   @db.Text
+  mediaUrl    String?
+  isPaywalled Boolean  @default(false)
+  price       Float?   @default(0.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  likes    Like[]
+  comments Comment[]
+}
+
+model VaultContent {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  previewUrl   String
+  fullMediaUrl String
+  price        Float
+  createdAt    DateTime @default(now())
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  body        String   @db.Text
+  isEncrypted Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+}
